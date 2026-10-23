@@ -37,20 +37,10 @@ drop policy if exists "Users read their own journals" on shipping.journals;
 drop policy if exists "Users create their own journals" on shipping.journals;
 drop policy if exists "Users update their own journals" on shipping.journals;
 drop policy if exists "Users delete their own journals" on shipping.journals;
+drop policy if exists shipping_journals_select_own on shipping.journals;
+drop policy if exists shipping_journals_insert_own on shipping.journals;
+drop policy if exists shipping_journals_update_own on shipping.journals;
+drop policy if exists shipping_journals_delete_own on shipping.journals;
+drop policy if exists shipping_journals_own on shipping.journals;
 
-create policy "Users read their own journals"
-on shipping.journals for select to authenticated
-using ((select auth.uid()) = user_id);
-
-create policy "Users create their own journals"
-on shipping.journals for insert to authenticated
-with check ((select auth.uid()) = user_id);
-
-create policy "Users update their own journals"
-on shipping.journals for update to authenticated
-using ((select auth.uid()) = user_id)
-with check ((select auth.uid()) = user_id);
-
-create policy "Users delete their own journals"
-on shipping.journals for delete to authenticated
-using ((select auth.uid()) = user_id);
+create policy shipping_journals_own on shipping.journals for all to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
