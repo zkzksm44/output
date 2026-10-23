@@ -47,7 +47,7 @@ async function loadCloud(){
   if(!currentUser)return;
   setSync('불러오는 중','syncing');
   const {data:journal,error}=await shipping.from('journals').select('data,updated_at').eq('user_id',currentUser.id).eq('work_date',workDate).maybeSingle();
-  if(error){setSync('동기화 오류');openAuth('데이터베이스 설정이 필요합니다. schema.sql을 먼저 실행해 주세요.');return}
+  if(error){setSync('동기화 오류');openAuth('데이터베이스 설정이 필요합니다. Supabase 설치 SQL 1단계와 2단계를 실행해 주세요.');return}
   if(journal?.data){data={...emptyData(),...journal.data};cache();render();showToast('저장된 출고일지를 불러왔습니다.')}
   setSync('클라우드 연결됨','online');
 }
