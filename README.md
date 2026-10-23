@@ -25,4 +25,13 @@ node -e "const h=require('http'),f=require('fs'),p=require('path');h.createServe
 
 ## 운영 전 권장사항
 
-현재 입력 내용은 브라우저 메모리에만 유지되며 새로고침하면 초기화됩니다. 실제 운영에는 데이터베이스, 사용자 인증, 출고일지 저장 API 및 백업 정책이 추가로 필요합니다.
+출고 데이터는 Supabase에 날짜별로 저장되며 같은 계정으로 로그인한 기기에서 공유됩니다. 네트워크 오류에 대비해 현재 날짜의 편집 내용은 브라우저에도 임시 저장됩니다.
+
+### Supabase 최초 설정
+
+1. Supabase 프로젝트의 **SQL Editor**를 엽니다.
+2. [`supabase/schema.sql`](supabase/schema.sql)의 전체 내용을 실행합니다.
+3. **Authentication → URL Configuration**에서 Site URL을 `https://zkzksm44.github.io/output/`으로 설정합니다.
+4. 이메일 확인을 사용하는 경우 Redirect URLs에도 같은 주소를 추가합니다.
+
+브라우저에는 공개 가능한 publishable key만 사용합니다. Secret 또는 service role 키는 프런트엔드에 추가하면 안 됩니다.
