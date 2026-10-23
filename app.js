@@ -7,6 +7,7 @@ const cacheKey=`thomson-shipping-${workDate}`;
 let data=loadCache(),active='업소용',currentUser=null;
 const form=$('#entryForm'),list=$('#itemList'),empty=$('#emptyState');
 const cloud=window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL,window.APP_CONFIG.SUPABASE_PUBLISHABLE_KEY);
+const shipping=cloud.schema('shipping');
 
 function loadCache(){try{return {...emptyData(),...JSON.parse(localStorage.getItem(cacheKey))}}catch{return emptyData()}}
 function cache(){localStorage.setItem(cacheKey,JSON.stringify(data))}
@@ -45,7 +46,7 @@ function updateAuthUI(user){
 async function loadCloud(){
   if(!currentUser)return;
   setSync('불러오는 중','syncing');
-  const {data:journal,error}=await cloud.from('shipping_journals').select('data,updated_at').eq('user_id',currentUser.id).eq('work_date',workDate).maybeSingle();
+  const {data:journal,error}=await shipping.from('journals').select('data,updated_at').eq('user_id',currentUser.id).eq('work_date',workDate).maybeSingle();
   if(error){setSync('동기화 오류');openAuth('데이터베이스 설정이 필요합니다. schema.sql을 먼저 실행해 주세요.');return}
   if(journal?.data){data={...emptyData(),...journal.data};cache();render();showToast('저장된 출고일지를 불러왔습니다.')}
   setSync('클라우드 연결됨','online');
@@ -54,7 +55,7 @@ async function loadCloud(){
 async function saveCloud(){
   if(!currentUser){openAuth('저장하려면 먼저 로그인해 주세요.');return}
   const button=$('#saveBtn');button.disabled=true;button.textContent='저장 중…';setSync('저장 중','syncing');
-  const {error}=await cloud.from('shipping_journals').upsert({user_id:currentUser.id,work_date:workDate,data,updated_at:new Date().toISOString()},{onConflict:'user_id,work_date'});
+  const {error}=await shipping.from('journals').upsert({user_id:currentUser.id,work_date:workDate,data,updated_at:new Date().toISOString()},{onConflict:'user_id,work_date'});
   button.disabled=false;button.textContent='출고일지 저장';
   if(error){setSync('저장 실패');showToast('저장하지 못했습니다. DB 설정을 확인해 주세요.');return}
   setSync('저장 완료','online');showToast('클라우드에 저장되었습니다.');

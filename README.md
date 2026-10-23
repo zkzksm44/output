@@ -30,8 +30,9 @@ node -e "const h=require('http'),f=require('fs'),p=require('path');h.createServe
 ### Supabase 최초 설정
 
 1. Supabase 프로젝트의 **SQL Editor**를 엽니다.
-2. [`supabase/schema.sql`](supabase/schema.sql)의 전체 내용을 실행합니다.
-3. **Authentication → URL Configuration**에서 Site URL을 `https://zkzksm44.github.io/output/`으로 설정합니다.
-4. 이메일 확인을 사용하는 경우 Redirect URLs에도 같은 주소를 추가합니다.
+2. [`supabase/schema.sql`](supabase/schema.sql)의 전체 내용을 실행합니다. 출고 데이터는 `shipping.journals`에 생성되며, 기존 `public.shipping_journals`가 있으면 데이터 보존 상태로 자동 이동됩니다.
+3. **Integrations → Data API → Exposed schemas**에 `shipping`을 추가합니다. `public`을 제거할지는 다른 기능의 사용 여부에 따라 결정합니다.
+4. **Authentication → URL Configuration**에서 Site URL을 `https://zkzksm44.github.io/output/`으로 설정합니다.
+5. 이메일 확인을 사용하는 경우 Redirect URLs에도 같은 주소를 추가합니다.
 
 브라우저에는 공개 가능한 publishable key만 사용합니다. Secret 또는 service role 키는 프런트엔드에 추가하면 안 됩니다.
