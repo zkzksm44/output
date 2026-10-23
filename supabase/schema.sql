@@ -1,17 +1,6 @@
 -- 출고 도메인을 public 스키마와 분리합니다.
 create schema if not exists shipping;
 
--- 이전 버전의 테이블이 있으면 데이터와 제약조건을 보존한 채 이동합니다.
-do $$
-begin
-  if to_regclass('shipping.journals') is null
-     and to_regclass('public.shipping_journals') is not null then
-    alter table public.shipping_journals set schema shipping;
-    alter table shipping.shipping_journals rename to journals;
-  end if;
-end
-$$;
-
 create table if not exists shipping.journals (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
