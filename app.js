@@ -35,6 +35,36 @@ function render(){
   list.replaceChildren(...rows.map(createItemRow));empty.style.display=rows.length?'none':'block';list.style.display=rows.length?'block':'none';
 }
 
+function buildPrintSheet(){
+  const sheet=$('#printSheet');
+  const heading=document.createElement('header');heading.className='print-heading';
+  const title=document.createElement('h1');title.textContent='출고일지';
+  const printedDate=document.createElement('p');printedDate.textContent=`출고일자  ${workDate}`;
+  heading.append(title,printedDate);
+
+  const summary=document.createElement('p');summary.className='print-summary';
+  summary.textContent=`당일 총 출고수량  ${totals().toLocaleString()}개`;
+  const sections=Object.entries(labels).filter(([category])=>data[category].length).map(([category,label])=>{
+    const section=document.createElement('section');section.className='print-category';
+    const sectionHeading=document.createElement('div');sectionHeading.className='print-category-heading';
+    const name=document.createElement('h2');name.textContent=label;
+    const subtotal=document.createElement('strong');subtotal.textContent=`소계 ${data[category].reduce((sum,item)=>sum+item.qty,0).toLocaleString()}개`;
+    sectionHeading.append(name,subtotal);
+    const table=document.createElement('table');
+    const thead=document.createElement('thead');const headerRow=document.createElement('tr');
+    for(const text of ['번호','품명','수량']){const th=document.createElement('th');th.textContent=text;headerRow.appendChild(th)}
+    thead.appendChild(headerRow);
+    const tbody=document.createElement('tbody');
+    data[category].forEach((item,index)=>{
+      const row=document.createElement('tr');
+      for(const value of [index+1,item.name,item.qty.toLocaleString()]){const cell=document.createElement('td');cell.textContent=value;row.appendChild(cell)}
+      tbody.appendChild(row);
+    });
+    table.append(thead,tbody);section.append(sectionHeading,table);return section;
+  });
+  sheet.replaceChildren(heading,summary,...sections);
+}
+
 function openAuth(message=''){$('#authMessage').textContent=message;$('#authModal').classList.add('show');$('#authModal').setAttribute('aria-hidden','false')}
 function closeAuth(){$('#authModal').classList.remove('show');$('#authModal').setAttribute('aria-hidden','true')}
 function updateAuthUI(user){
@@ -67,6 +97,8 @@ $('#plusBtn').addEventListener('click',()=>{$('#qtyInput').value=Number($('#qtyI
 form.addEventListener('submit',event=>{event.preventDefault();const rawName=$('#productInput').value.trim().replace(/\s+/g,' '),qty=Math.max(1,Number($('#qtyInput').value)||1),key=normalizeName(rawName),existing=data[active].find(item=>item.key===key);if(existing)existing.qty+=qty;else data[active].push({name:rawName,key,qty});cache();form.reset();$('#qtyInput').value=1;$('#productInput').focus();render()});
 list.addEventListener('click',event=>{const action=event.target.dataset.action,index=Number(event.target.dataset.index);if(!action)return;if(action==='remove')data[active].splice(index,1);if(action==='plus')data[active][index].qty++;if(action==='minus')data[active][index].qty=Math.max(1,data[active][index].qty-1);cache();render()});
 $('#clearBtn').addEventListener('click',()=>{data[active]=[];cache();render()});
+$('#printBtn').addEventListener('click',()=>{if(!totals()){showToast('인쇄할 출고품목이 없습니다.');return}buildPrintSheet();window.print()});
+window.addEventListener('beforeprint',buildPrintSheet);
 $('#saveBtn').addEventListener('click',saveCloud);$('#accountBtn').addEventListener('click',()=>openAuth());$('#authClose').addEventListener('click',closeAuth);
 $('#signInBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='로그인 중…';const {data:result,error}=await cloud.auth.signInWithPassword({email,password});if(error){$('#authMessage').textContent=error.message;return}updateAuthUI(result.user);closeAuth();await loadCloud()});
 $('#signUpBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='계정 생성 중…';const {data:result,error}=await cloud.auth.signUp({email,password});if(error){$('#authMessage').textContent=error.message;return}if(result.session){updateAuthUI(result.user);closeAuth();await loadCloud()}else{$('#authMessage').textContent='확인 이메일을 보냈습니다. 인증 후 로그인해 주세요.'}});

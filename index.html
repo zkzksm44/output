@@ -3,7 +3,7 @@
   <div class="app-shell">
     <header class="topbar"><div><span class="brand-mark">T</span><strong>톰슨팩토리</strong></div><div class="top-actions"><span class="sync-status" id="syncStatus">로그인 필요</span><button class="history-btn" id="accountBtn">로그인</button></div></header>
     <main>
-      <section class="page-title"><div><p id="todayText">오늘 출고</p><h1>출고품목 입력</h1></div><button class="more" aria-label="더보기">•••</button></section>
+      <section class="page-title"><div><p id="todayText">오늘 출고</p><h1>출고품목 입력</h1></div><button class="print-btn" id="printBtn" type="button" aria-label="당일 출고품목 인쇄">인쇄</button></section>
       <section class="total-card"><div><span>오늘 총 출고수량</span><strong id="grandTotal">0</strong><small>개</small></div><div class="progress"><i id="progressBar"></i></div><p><b id="filledCategories">0</b>/5개 출고 구분 입력</p></section>
 
       <nav class="category-tabs" aria-label="출고 구분">
@@ -26,6 +26,7 @@
       <section class="list-section"><div class="list-head"><h2>입력 품목 <b id="itemCount">0</b></h2><button id="clearBtn">전체 삭제</button></div><div id="emptyState" class="empty"><span>＋</span><strong>아직 입력한 품목이 없습니다</strong><p>위 입력창에서 첫 품목을 추가해보세요.</p></div><div id="itemList" class="item-list"></div></section>
     </main>
     <footer class="bottom-action"><div><span>전체 합계</span><strong><b id="footerTotal">0</b>개</strong></div><button id="saveBtn">출고일지 저장</button></footer>
+    <section class="print-sheet" id="printSheet" aria-hidden="true"></section>
     <div class="toast" id="toast">출고일지가 저장되었습니다.</div>
     <div class="auth-modal" id="authModal" aria-hidden="true">
       <div class="auth-card">
