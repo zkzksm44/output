@@ -1,0 +1,20 @@
+form {
+  grid-template-columns: minmax(0, 1.45fr) minmax(130px, 1fr);
+}
+
+.product-field small {
+  display: block;
+  margin-top: 7px;
+  color: #98a1b0;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.item-info span {
+  display: none;
+}
+
+@media (max-width: 390px) {
+  form { grid-template-columns: 1fr; }
+  .product-field, .stepper, .add-btn { grid-column: 1 / -1; }
+}

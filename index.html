@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><meta name="theme-color" content="#17253e"><title>톰슨팩토리 모바일 출고</title><link rel="stylesheet" href="styles.css"></head>
+<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><meta name="theme-color" content="#17253e"><title>톰슨팩토리 모바일 출고</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="overrides.css"></head>
 <body>
   <div class="app-shell">
     <header class="topbar"><div><span class="brand-mark">T</span><strong>톰슨팩토리</strong></div><button class="history-btn">출고 내역</button></header>
@@ -17,8 +17,7 @@
       <section class="entry-card">
         <div class="section-head"><div><h2 id="categoryTitle">쇼핑몰 업소용</h2><p>출고할 품목과 수량을 입력하세요.</p></div><span id="categorySubtotal">0개</span></div>
         <form id="entryForm">
-          <label class="wide">품명<input id="productInput" list="products" placeholder="품명을 입력하거나 선택" autocomplete="off" required><datalist id="products"><option>등심</option><option>안심</option><option>치즈</option><option>고치</option><option>고롤</option><option>생선</option><option>양념 생선</option><option>소스</option><option>사각어묵</option><option>롤치</option></datalist></label>
-          <label>규격<input id="specInput" placeholder="예: 120g"></label>
+          <label class="product-field">품명<input id="productInput" list="products" placeholder="예: 등심 100" autocomplete="off" required><datalist id="products"><option>등심 100</option><option>등심 120</option><option>등심 150</option><option>등심 180</option><option>등심 200</option><option>등심 250</option><option>안심</option><option>치즈</option><option>고치</option><option>고롤</option><option>생선</option><option>양념 생선</option><option>소스 5kg</option><option>롤치</option></datalist><small>같은 품명은 수량이 자동으로 합산됩니다.</small></label>
           <label>수량<div class="stepper"><button type="button" id="minusBtn">−</button><input id="qtyInput" type="number" min="1" value="1" inputmode="numeric" required><button type="button" id="plusBtn">＋</button></div></label>
           <button class="add-btn" type="submit">＋ 목록에 추가</button>
         </form>
