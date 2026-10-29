@@ -1,7 +1,7 @@
 <!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><meta name="theme-color" content="#17253e"><title>톰슨팩토리 모바일 출고</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="overrides.css"></head>
 <body>
   <div class="app-shell">
-    <header class="topbar"><div><span class="brand-mark">T</span><strong>톰슨팩토리</strong></div><div class="top-actions"><span class="sync-status" id="syncStatus">로그인 필요</span><button class="history-btn" id="accountBtn">로그인</button></div></header>
+    <header class="topbar"><div><span class="brand-mark">T</span><strong>톰슨팩토리</strong></div><div class="top-actions"><span class="sync-status" id="syncStatus">로그인 필요</span><button class="journal-board-btn" id="journalBoardBtn" type="button">출고일지</button><button class="history-btn" id="accountBtn">로그인</button></div></header>
     <main>
       <section class="page-title"><div><p id="todayText">오늘 출고</p><h1>출고품목 입력</h1></div><button class="excel-btn" id="excelBtn" type="button" aria-label="당일 출고품목 엑셀 다운로드">엑셀 다운로드</button></section>
       <section class="total-card"><div><span>오늘 총 출고수량</span><strong id="grandTotal">0</strong><small>개</small></div><div class="progress"><i id="progressBar"></i></div><p><b id="filledCategories">0</b>/5개 출고 구분 입력</p></section>
@@ -27,11 +27,18 @@
     </main>
     <footer class="bottom-action"><div><span>전체 합계</span><strong><b id="footerTotal">0</b>개</strong></div><button id="saveBtn">출고일지 저장</button></footer>
     <div class="toast" id="toast">출고일지가 저장되었습니다.</div>
+    <div class="journal-modal" id="journalModal" aria-hidden="true">
+      <section class="journal-card" role="dialog" aria-modal="true" aria-labelledby="journalTitle">
+        <button class="journal-close" id="journalClose" type="button" aria-label="닫기">×</button>
+        <div class="journal-heading"><p>공유 출고 기록</p><h2 id="journalTitle">날짜별 출고일지</h2><span>저장된 출고일지를 선택해 엑셀로 내려받으세요.</span></div>
+        <div class="journal-list" id="journalList"><p class="journal-loading">출고일지를 불러오는 중…</p></div>
+      </section>
+    </div>
     <div class="auth-modal" id="authModal" aria-hidden="true">
       <div class="auth-card">
         <button class="auth-close" id="authClose" aria-label="닫기">×</button>
         <span class="auth-icon">☁</span><h2>클라우드 동기화</h2>
-        <p>같은 계정으로 로그인하면 모든 기기에서 출고 데이터를 확인할 수 있습니다.</p>
+        <p>등록된 계정으로 로그인하면 모든 기기에서 저장된 출고 데이터를 확인할 수 있습니다.</p>
         <label>이메일<input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com"></label>
         <label>비밀번호<input id="authPassword" type="password" autocomplete="current-password" minlength="6" placeholder="6자 이상"></label>
         <button class="auth-primary" id="signInBtn">로그인</button>

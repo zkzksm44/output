@@ -4,7 +4,7 @@ const $=selector=>document.querySelector(selector);
 const date=new Date();
 const workDate=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 const cacheKey=`thomson-shipping-${workDate}`;
-let data=loadCache(),active='업소용',currentUser=null,products=[],productMatches=[],activeProductIndex=-1,selectedProduct=null;
+let data=loadCache(),active='업소용',currentUser=null,products=[],productMatches=[],activeProductIndex=-1,selectedProduct=null,journalEntries=[],openBoardAfterAuth=false;
 const form=$('#entryForm'),list=$('#itemList'),empty=$('#emptyState');
 const productInput=$('#productInput'),productSuggestions=$('#productSuggestions'),productHelp=$('#productHelp');
 const cloud=window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL,window.APP_CONFIG.SUPABASE_PUBLISHABLE_KEY);
@@ -22,7 +22,8 @@ function findProducts(query){
   const score=product=>{const name=productSearchValue(product.name),initials=productSearchValue(getChoseong(product.name));if(name.startsWith(needle))return 0;if(initials.startsWith(needle))return 1;if(name.includes(needle))return 2;if(initials.includes(needle))return 3;return 99};
   return products.map(product=>({product,score:score(product)})).filter(result=>result.score<99).sort((a,b)=>a.score-b.score||a.product.display_order-b.product.display_order).slice(0,8).map(result=>result.product);
 }
-const totals=()=>Object.values(data).flat().reduce((sum,item)=>sum+item.qty,0);
+const totalForData=sourceData=>Object.keys(labels).flatMap(category=>sourceData?.[category]||[]).reduce((sum,item)=>sum+(Number(item.qty)||0),0);
+const totals=()=>totalForData(data);
 function showToast(message){const toast=$('#toast');toast.textContent=message;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2400)}
 function setSync(text,state=''){const el=$('#syncStatus');el.textContent=text;el.className=`sync-status ${state}`}
 
@@ -69,10 +70,10 @@ function render(){
   list.replaceChildren(...rows.map(createItemRow));empty.style.display=rows.length?'none':'block';list.style.display=rows.length?'block':'none';
 }
 
-function buildExcelTable(){
+function buildExcelTable(sourceData=data){
   const categories=Object.keys(labels),productRows=new Map();
   categories.forEach((category,categoryIndex)=>{
-    data[category].forEach(item=>{
+    (sourceData?.[category]||[]).forEach(item=>{
       const key=item.key||normalizeName(item.name);
       if(!productRows.has(key))productRows.set(key,{name:item.name,quantities:Array(categories.length).fill(0)});
       productRows.get(key).quantities[categoryIndex]+=Number(item.qty)||0;
@@ -81,19 +82,20 @@ function buildExcelTable(){
   return [...productRows.values()].map(item=>[item.name,...item.quantities]);
 }
 
-async function downloadExcel(){
-  if(!totals()){showToast('다운로드할 출고품목이 없습니다.');return}
+async function downloadExcel(sourceData=data,sourceDate=workDate,button=$('#excelBtn')){
+  if(!totalForData(sourceData)){showToast('다운로드할 출고품목이 없습니다.');return}
   if(!window.ExcelJS){showToast('엑셀 모듈을 불러오지 못했습니다. 다시 시도해 주세요.');return}
-  const button=$('#excelBtn');button.disabled=true;button.textContent='생성 중…';
+  const originalText=button.textContent;button.disabled=true;button.textContent='생성 중…';
   try{
     const workbook=new window.ExcelJS.Workbook();
     workbook.creator='톰슨팩토리';workbook.created=new Date();
     const worksheet=workbook.addWorksheet('당일 출고',{views:[{state:'frozen',ySplit:4}]});
     worksheet.mergeCells('A1:F1');worksheet.getCell('A1').value='톰슨팩토리 당일 출고일지';
-    worksheet.getCell('A2').value='출고일자';worksheet.getCell('B2').value=new Date(date.getFullYear(),date.getMonth(),date.getDate());worksheet.getCell('B2').numFmt='yyyy-mm-dd';
+    const [year,month,day]=sourceDate.split('-').map(Number);
+    worksheet.getCell('A2').value='출고일자';worksheet.getCell('B2').value=new Date(year,month-1,day);worksheet.getCell('B2').numFmt='yyyy-mm-dd';
     worksheet.addRow([]);
     const headerRow=worksheet.addRow(['품명',...Object.values(labels)]);
-    buildExcelTable().forEach(row=>worksheet.addRow(row));
+    buildExcelTable(sourceData).forEach(row=>worksheet.addRow(row));
     const lastDataRow=worksheet.lastRow.number;
 
     worksheet.columns=[{width:30},{width:17},{width:15},{width:21},{width:12},{width:12}];
@@ -113,9 +115,34 @@ async function downloadExcel(){
     worksheet.autoFilter={from:{row:headerRow.number,column:1},to:{row:lastDataRow,column:6}};
     const buffer=await workbook.xlsx.writeBuffer();
     const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-    const link=document.createElement('a');link.href=url;link.download=`톰슨팩토리_출고일지_${workDate}.xlsx`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    const link=document.createElement('a');link.href=url;link.download=`톰슨팩토리_출고일지_${sourceDate}.xlsx`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(error){console.error(error);showToast('엑셀 파일을 만들지 못했습니다. 다시 시도해 주세요.')}
-  finally{button.disabled=false;button.textContent='엑셀 다운로드'}
+  finally{button.disabled=false;button.textContent=originalText}
+}
+
+function formatJournalDate(value){const [year,month,day]=value.split('-').map(Number);return `${year}년 ${month}월 ${day}일`}
+function closeJournalBoard(){$('#journalModal').classList.remove('show');$('#journalModal').setAttribute('aria-hidden','true')}
+function renderJournalBoard(){
+  const container=$('#journalList');
+  if(!journalEntries.length){container.innerHTML='<p class="journal-empty">저장된 출고일지가 없습니다.</p>';return}
+  const rows=journalEntries.map((journal,index)=>{
+    const row=document.createElement('article');row.className='journal-row';
+    const info=document.createElement('div');const title=document.createElement('strong');title.textContent=formatJournalDate(journal.work_date);
+    const categories=Object.keys(labels).filter(category=>(journal.data?.[category]||[]).length).length;
+    const meta=document.createElement('span');meta.textContent=`출고 구분 ${categories}개 · 품목 수량 ${totalForData(journal.data).toLocaleString()}개`;
+    info.append(title,meta);
+    const button=document.createElement('button');button.type='button';button.className='journal-download';button.dataset.index=index;button.textContent='엑셀 다운로드';
+    row.append(info,button);return row;
+  });
+  container.replaceChildren(...rows);
+}
+async function openJournalBoard(){
+  if(!currentUser){openBoardAfterAuth=true;openAuth('출고일지를 보려면 먼저 로그인해 주세요.');return}
+  $('#journalModal').classList.add('show');$('#journalModal').setAttribute('aria-hidden','false');$('#journalList').innerHTML='<p class="journal-loading">출고일지를 불러오는 중…</p>';
+  const {data:rows,error}=await shipping.from('journals').select('id,work_date,data,updated_at').order('work_date',{ascending:false}).order('updated_at',{ascending:false});
+  if(error){$('#journalList').innerHTML='<p class="journal-empty">출고일지를 불러오지 못했습니다.<br>협업 조회 SQL 설정을 확인해 주세요.</p>';return}
+  const latestByDate=new Map();(rows||[]).forEach(row=>{if(!latestByDate.has(row.work_date))latestByDate.set(row.work_date,row)});
+  journalEntries=[...latestByDate.values()].filter(journal=>totalForData(journal.data)>0);renderJournalBoard();
 }
 
 function openAuth(message=''){$('#authMessage').textContent=message;$('#authModal').classList.add('show');$('#authModal').setAttribute('aria-hidden','false')}
@@ -161,11 +188,15 @@ productSuggestions.addEventListener('mousedown',event=>{const option=event.targe
 document.addEventListener('click',event=>{if(!event.target.closest('.product-search'))hideProductSuggestions()});
 list.addEventListener('click',event=>{const action=event.target.dataset.action,index=Number(event.target.dataset.index);if(!action)return;if(action==='remove')data[active].splice(index,1);if(action==='plus')data[active][index].qty++;if(action==='minus')data[active][index].qty=Math.max(1,data[active][index].qty-1);cache();render()});
 $('#clearBtn').addEventListener('click',()=>{data[active]=[];cache();render()});
-$('#excelBtn').addEventListener('click',downloadExcel);
+$('#excelBtn').addEventListener('click',()=>downloadExcel());
+$('#journalBoardBtn').addEventListener('click',openJournalBoard);$('#journalClose').addEventListener('click',closeJournalBoard);
+$('#journalModal').addEventListener('click',event=>{if(event.target===$('#journalModal'))closeJournalBoard()});
+$('#journalList').addEventListener('click',event=>{const button=event.target.closest('.journal-download');if(!button)return;const journal=journalEntries[Number(button.dataset.index)];if(journal)downloadExcel(journal.data,journal.work_date,button)});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('#journalModal').classList.contains('show'))closeJournalBoard()});
 $('#saveBtn').addEventListener('click',saveCloud);$('#accountBtn').addEventListener('click',()=>openAuth());$('#authClose').addEventListener('click',closeAuth);
-$('#signInBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='로그인 중…';const {data:result,error}=await cloud.auth.signInWithPassword({email,password});if(error){$('#authMessage').textContent=error.message;return}updateAuthUI(result.user);closeAuth();await Promise.all([loadCloud(),loadProducts()])});
-$('#signUpBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='계정 생성 중…';const {data:result,error}=await cloud.auth.signUp({email,password});if(error){$('#authMessage').textContent=error.message;return}if(result.session){updateAuthUI(result.user);closeAuth();await Promise.all([loadCloud(),loadProducts()])}else{$('#authMessage').textContent='확인 이메일을 보냈습니다. 인증 후 로그인해 주세요.'}});
-$('#signOutBtn').addEventListener('click',async()=>{await cloud.auth.signOut();products=[];productHelp.textContent='로그인하면 품명 DB에서 검색할 수 있습니다.';hideProductSuggestions();updateAuthUI(null);closeAuth();showToast('로그아웃했습니다.')});
+$('#signInBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='로그인 중…';const {data:result,error}=await cloud.auth.signInWithPassword({email,password});if(error){$('#authMessage').textContent=error.message;return}updateAuthUI(result.user);closeAuth();await Promise.all([loadCloud(),loadProducts()]);if(openBoardAfterAuth){openBoardAfterAuth=false;await openJournalBoard()}});
+$('#signUpBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='계정 생성 중…';const {data:result,error}=await cloud.auth.signUp({email,password});if(error){$('#authMessage').textContent=error.message;return}if(result.session){updateAuthUI(result.user);closeAuth();await Promise.all([loadCloud(),loadProducts()]);if(openBoardAfterAuth){openBoardAfterAuth=false;await openJournalBoard()}}else{$('#authMessage').textContent='확인 이메일을 보냈습니다. 인증 후 로그인해 주세요.'}});
+$('#signOutBtn').addEventListener('click',async()=>{await cloud.auth.signOut();products=[];journalEntries=[];productHelp.textContent='로그인하면 품명 DB에서 검색할 수 있습니다.';hideProductSuggestions();closeJournalBoard();updateAuthUI(null);closeAuth();showToast('로그아웃했습니다.')});
 cloud.auth.onAuthStateChange((_event,session)=>{updateAuthUI(session?.user||null)});
 
 $('#todayText').textContent=`${date.getMonth()+1}월 ${date.getDate()}일 오늘 출고`;

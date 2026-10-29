@@ -6,6 +6,10 @@
 
 화면 상단의 **엑셀 다운로드** 버튼으로 품명별 수량을 5개 출고 구분 열에 모은 테두리 표를 `.xlsx` 파일로 내려받을 수 있습니다.
 
+로그인한 협업 담당자는 상단의 **출고일지** 버튼에서 저장된 기록을 날짜별로 확인하고 원하는 날짜의 엑셀 파일을 내려받을 수 있습니다. 동일 날짜에 여러 계정의 기록이 있으면 가장 최근에 저장된 기록을 표시합니다.
+
+`04_enable_collaborator_read.sql`을 적용하면 로그인한 모든 계정이 출고일지를 조회할 수 있습니다. 운영 환경에서는 협업 계정을 먼저 만든 뒤 Supabase Authentication 설정에서 신규 가입을 제한하는 것을 권장합니다.
+
 ## 로컬 실행
 
 별도 빌드나 패키지 설치가 필요하지 않습니다.
@@ -38,9 +42,10 @@ node -e "const h=require('http'),f=require('fs'),p=require('path');h.createServe
 3. 기존 `public.shipping_journals`에 보존할 데이터가 있는 경우에만 [`migrate_from_public.sql`](supabase/migrate_from_public.sql)을 실행합니다. 최초 설치라면 이 단계는 건너뜁니다.
 4. 다른 새 빈 탭에 [`02_create_shipping_journals.sql`](supabase/02_create_shipping_journals.sql)의 전체 내용을 붙여넣고 실행합니다. 기존 쿼리 내용을 이어 붙이지 마세요.
 5. 다른 새 빈 탭에 [`03_create_products.sql`](supabase/03_create_products.sql)의 전체 내용을 실행합니다. 검게 지운 품목을 제외한 24개 품목이 등록됩니다.
-6. `select to_regclass('shipping.journals'), to_regclass('shipping.products');`를 실행해 두 결과가 모두 표시되는지 확인합니다.
-7. **Integrations → Data API → Exposed schemas**에 `shipping`을 추가합니다. `public`을 제거할지는 다른 기능의 사용 여부에 따라 결정합니다.
-8. **Authentication → URL Configuration**에서 Site URL을 `https://zkzksm44.github.io/output/`으로 설정합니다.
-9. 이메일 확인을 사용하는 경우 Redirect URLs에도 같은 주소를 추가합니다.
+6. 협업 담당자가 자신의 계정으로 날짜별 기록을 조회해야 한다면 [`04_enable_collaborator_read.sql`](supabase/04_enable_collaborator_read.sql)을 새 빈 SQL Editor 탭에서 실행합니다.
+7. `select to_regclass('shipping.journals'), to_regclass('shipping.products');`를 실행해 두 결과가 모두 표시되는지 확인합니다.
+8. **Integrations → Data API → Exposed schemas**에 `shipping`을 추가합니다. `public`을 제거할지는 다른 기능의 사용 여부에 따라 결정합니다.
+9. **Authentication → URL Configuration**에서 Site URL을 `https://zkzksm44.github.io/output/`으로 설정합니다.
+10. 이메일 확인을 사용하는 경우 Redirect URLs에도 같은 주소를 추가합니다.
 
 브라우저에는 공개 가능한 publishable key만 사용합니다. Secret 또는 service role 키는 프런트엔드에 추가하면 안 됩니다.
