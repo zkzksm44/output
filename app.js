@@ -78,7 +78,7 @@ function buildExcelTable(){
       productRows.get(key).quantities[categoryIndex]+=Number(item.qty)||0;
     });
   });
-  return [...productRows.values()].map(item=>[item.name,...item.quantities,item.quantities.reduce((sum,qty)=>sum+qty,0)]);
+  return [...productRows.values()].map(item=>[item.name,...item.quantities]);
 }
 
 async function downloadExcel(){
@@ -88,32 +88,29 @@ async function downloadExcel(){
   try{
     const workbook=new window.ExcelJS.Workbook();
     workbook.creator='톰슨팩토리';workbook.created=new Date();
-    const worksheet=workbook.addWorksheet('당일 출고',{views:[{state:'frozen',ySplit:5}]});
-    worksheet.mergeCells('A1:G1');worksheet.getCell('A1').value='톰슨팩토리 당일 출고일지';
+    const worksheet=workbook.addWorksheet('당일 출고',{views:[{state:'frozen',ySplit:4}]});
+    worksheet.mergeCells('A1:F1');worksheet.getCell('A1').value='톰슨팩토리 당일 출고일지';
     worksheet.getCell('A2').value='출고일자';worksheet.getCell('B2').value=new Date(date.getFullYear(),date.getMonth(),date.getDate());worksheet.getCell('B2').numFmt='yyyy-mm-dd';
-    worksheet.getCell('A3').value='전체 합계';worksheet.getCell('B3').value=totals();worksheet.getCell('B3').numFmt='#,##0';
     worksheet.addRow([]);
-    const headerRow=worksheet.addRow(['품명',...Object.values(labels),'합계']);
+    const headerRow=worksheet.addRow(['품명',...Object.values(labels)]);
     buildExcelTable().forEach(row=>worksheet.addRow(row));
-    const categoryTotals=Object.keys(labels).map(category=>data[category].reduce((sum,item)=>sum+(Number(item.qty)||0),0));
-    const totalRow=worksheet.addRow(['합계',...categoryTotals,totals()]);
+    const lastDataRow=worksheet.lastRow.number;
 
-    worksheet.columns=[{width:30},{width:17},{width:15},{width:21},{width:12},{width:12},{width:13}];
+    worksheet.columns=[{width:30},{width:17},{width:15},{width:21},{width:12},{width:12}];
     worksheet.getCell('A1').font={name:'Arial',size:16,bold:true,color:{argb:'FF192238'}};
     worksheet.getCell('A1').alignment={vertical:'middle',horizontal:'left'};worksheet.getRow(1).height=28;
-    worksheet.getRow(2).font={name:'Arial',size:10};worksheet.getRow(3).font={name:'Arial',size:10,bold:true};
+    worksheet.getRow(2).font={name:'Arial',size:10};
     headerRow.height=32;headerRow.font={name:'Arial',size:10,bold:true,color:{argb:'FFFFFFFF'}};headerRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF16243C'}};headerRow.alignment={vertical:'middle',horizontal:'center',wrapText:true};
-    totalRow.font={name:'Arial',size:10,bold:true,color:{argb:'FF16243C'}};totalRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEEF4FF'}};
     const thinBorder={top:{style:'thin',color:{argb:'FFB8C1CF'}},left:{style:'thin',color:{argb:'FFB8C1CF'}},bottom:{style:'thin',color:{argb:'FFB8C1CF'}},right:{style:'thin',color:{argb:'FFB8C1CF'}}};
-    for(let rowNumber=headerRow.number;rowNumber<=totalRow.number;rowNumber++){
+    for(let rowNumber=headerRow.number;rowNumber<=lastDataRow;rowNumber++){
       const row=worksheet.getRow(rowNumber);row.height=rowNumber===headerRow.number?32:22;
-      for(let columnNumber=1;columnNumber<=7;columnNumber++){
+      for(let columnNumber=1;columnNumber<=6;columnNumber++){
         const cell=row.getCell(columnNumber);cell.border=thinBorder;cell.alignment={vertical:'middle',horizontal:columnNumber===1?'left':'right'};
         if(columnNumber>1)cell.numFmt='#,##0';
       }
     }
     headerRow.alignment={vertical:'middle',horizontal:'center',wrapText:true};
-    worksheet.autoFilter={from:{row:headerRow.number,column:1},to:{row:totalRow.number-1,column:7}};
+    worksheet.autoFilter={from:{row:headerRow.number,column:1},to:{row:lastDataRow,column:6}};
     const buffer=await workbook.xlsx.writeBuffer();
     const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
     const link=document.createElement('a');link.href=url;link.download=`톰슨팩토리_출고일지_${workDate}.xlsx`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
