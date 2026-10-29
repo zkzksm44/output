@@ -4,17 +4,51 @@ const $=selector=>document.querySelector(selector);
 const date=new Date();
 const workDate=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 const cacheKey=`thomson-shipping-${workDate}`;
-let data=loadCache(),active='업소용',currentUser=null;
+let data=loadCache(),active='업소용',currentUser=null,products=[],productMatches=[],activeProductIndex=-1,selectedProduct=null;
 const form=$('#entryForm'),list=$('#itemList'),empty=$('#emptyState');
+const productInput=$('#productInput'),productSuggestions=$('#productSuggestions'),productHelp=$('#productHelp');
 const cloud=window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL,window.APP_CONFIG.SUPABASE_PUBLISHABLE_KEY);
 const shipping=cloud.schema('shipping');
 
 function loadCache(){try{return {...emptyData(),...JSON.parse(localStorage.getItem(cacheKey))}}catch{return emptyData()}}
 function cache(){localStorage.setItem(cacheKey,JSON.stringify(data))}
 const normalizeName=name=>name.trim().replace(/\s+/g,' ').toLocaleLowerCase('ko-KR');
+const choseongLetters='ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+function getChoseong(text){return [...text].map(character=>{const code=character.charCodeAt(0);return code>=0xac00&&code<=0xd7a3?choseongLetters[Math.floor((code-0xac00)/588)]:character}).join('')}
+function productSearchValue(value){return normalizeName(value).replace(/\s/g,'')}
+function findProducts(query){
+  const needle=productSearchValue(query);
+  if(!needle)return products.slice(0,8);
+  const score=product=>{const name=productSearchValue(product.name),initials=productSearchValue(getChoseong(product.name));if(name.startsWith(needle))return 0;if(initials.startsWith(needle))return 1;if(name.includes(needle))return 2;if(initials.includes(needle))return 3;return 99};
+  return products.map(product=>({product,score:score(product)})).filter(result=>result.score<99).sort((a,b)=>a.score-b.score||a.product.display_order-b.product.display_order).slice(0,8).map(result=>result.product);
+}
 const totals=()=>Object.values(data).flat().reduce((sum,item)=>sum+item.qty,0);
 function showToast(message){const toast=$('#toast');toast.textContent=message;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2400)}
 function setSync(text,state=''){const el=$('#syncStatus');el.textContent=text;el.className=`sync-status ${state}`}
+
+function hideProductSuggestions(){productSuggestions.hidden=true;productInput.setAttribute('aria-expanded','false');activeProductIndex=-1}
+function selectProduct(product){selectedProduct=product;productInput.value=product.name;hideProductSuggestions();$('#qtyInput').focus()}
+function renderProductSuggestions(){
+  if(!products.length){hideProductSuggestions();return}
+  productMatches=findProducts(productInput.value);activeProductIndex=-1;
+  if(!productMatches.length){productSuggestions.replaceChildren();productSuggestions.hidden=false;productInput.setAttribute('aria-expanded','true');const emptyResult=document.createElement('p');emptyResult.className='product-no-result';emptyResult.textContent='일치하는 등록 품목이 없습니다.';productSuggestions.appendChild(emptyResult);return}
+  const options=productMatches.map((product,index)=>{
+    const option=document.createElement('button');option.type='button';option.className='product-suggestion';option.dataset.index=index;option.setAttribute('role','option');
+    const name=document.createElement('strong');name.textContent=product.name;
+    const meta=document.createElement('span');meta.textContent=`${product.product_type} · ${product.report_number}`;
+    option.append(name,meta);return option;
+  });
+  productSuggestions.replaceChildren(...options);productSuggestions.hidden=false;productInput.setAttribute('aria-expanded','true');
+}
+function updateProductHighlight(){productSuggestions.querySelectorAll('.product-suggestion').forEach((option,index)=>{const activeOption=index===activeProductIndex;option.classList.toggle('active',activeOption);option.setAttribute('aria-selected',String(activeOption));if(activeOption)option.scrollIntoView({block:'nearest'})})}
+
+async function loadProducts(){
+  if(!currentUser)return;
+  productHelp.textContent='품명 목록을 불러오는 중…';
+  const {data:rows,error}=await shipping.from('products').select('id,name,report_number,product_type,shelf_life,display_order').eq('is_active',true).order('display_order');
+  if(error){products=[];productHelp.textContent='품명 DB를 불러오지 못했습니다. 03_create_products.sql을 확인해 주세요.';return}
+  products=rows||[];productHelp.textContent=`등록 품목 ${products.length}개 · 품명이나 초성으로 검색하세요.`;
+}
 
 function createItemRow(item,index){
   const row=document.createElement('div');row.className='item-row';
@@ -94,17 +128,28 @@ async function saveCloud(){
 document.querySelectorAll('.category-tabs button').forEach(btn=>btn.addEventListener('click',()=>{active=btn.dataset.category;render()}));
 $('#minusBtn').addEventListener('click',()=>{$('#qtyInput').value=Math.max(1,Number($('#qtyInput').value)-1)});
 $('#plusBtn').addEventListener('click',()=>{$('#qtyInput').value=Number($('#qtyInput').value||0)+1});
-form.addEventListener('submit',event=>{event.preventDefault();const rawName=$('#productInput').value.trim().replace(/\s+/g,' '),qty=Math.max(1,Number($('#qtyInput').value)||1),key=normalizeName(rawName),existing=data[active].find(item=>item.key===key);if(existing)existing.qty+=qty;else data[active].push({name:rawName,key,qty});cache();form.reset();$('#qtyInput').value=1;$('#productInput').focus();render()});
+form.addEventListener('submit',event=>{
+  event.preventDefault();
+  const rawName=productInput.value.trim().replace(/\s+/g,' '),matchedProduct=selectedProduct?.name===rawName?selectedProduct:products.find(product=>normalizeName(product.name)===normalizeName(rawName)),qty=Math.max(1,Number($('#qtyInput').value)||1),key=normalizeName(rawName),existing=data[active].find(item=>item.key===key);
+  if(existing){existing.qty+=qty;if(matchedProduct){existing.productId=matchedProduct.id;existing.reportNumber=matchedProduct.report_number}}
+  else data[active].push({name:rawName,key,qty,productId:matchedProduct?.id||null,reportNumber:matchedProduct?.report_number||null});
+  cache();form.reset();selectedProduct=null;hideProductSuggestions();$('#qtyInput').value=1;productInput.focus();render();
+});
+productInput.addEventListener('input',()=>{selectedProduct=null;renderProductSuggestions()});
+productInput.addEventListener('focus',renderProductSuggestions);
+productInput.addEventListener('keydown',event=>{if(productSuggestions.hidden)return;if(event.key==='ArrowDown'){event.preventDefault();activeProductIndex=Math.min(activeProductIndex+1,productMatches.length-1);updateProductHighlight()}else if(event.key==='ArrowUp'){event.preventDefault();activeProductIndex=Math.max(activeProductIndex-1,0);updateProductHighlight()}else if(event.key==='Enter'&&activeProductIndex>=0){event.preventDefault();selectProduct(productMatches[activeProductIndex])}else if(event.key==='Escape'){hideProductSuggestions()}});
+productSuggestions.addEventListener('mousedown',event=>{const option=event.target.closest('.product-suggestion');if(!option)return;event.preventDefault();selectProduct(productMatches[Number(option.dataset.index)])});
+document.addEventListener('click',event=>{if(!event.target.closest('.product-search'))hideProductSuggestions()});
 list.addEventListener('click',event=>{const action=event.target.dataset.action,index=Number(event.target.dataset.index);if(!action)return;if(action==='remove')data[active].splice(index,1);if(action==='plus')data[active][index].qty++;if(action==='minus')data[active][index].qty=Math.max(1,data[active][index].qty-1);cache();render()});
 $('#clearBtn').addEventListener('click',()=>{data[active]=[];cache();render()});
 $('#printBtn').addEventListener('click',()=>{if(!totals()){showToast('인쇄할 출고품목이 없습니다.');return}buildPrintSheet();window.print()});
 window.addEventListener('beforeprint',buildPrintSheet);
 $('#saveBtn').addEventListener('click',saveCloud);$('#accountBtn').addEventListener('click',()=>openAuth());$('#authClose').addEventListener('click',closeAuth);
-$('#signInBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='로그인 중…';const {data:result,error}=await cloud.auth.signInWithPassword({email,password});if(error){$('#authMessage').textContent=error.message;return}updateAuthUI(result.user);closeAuth();await loadCloud()});
-$('#signUpBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='계정 생성 중…';const {data:result,error}=await cloud.auth.signUp({email,password});if(error){$('#authMessage').textContent=error.message;return}if(result.session){updateAuthUI(result.user);closeAuth();await loadCloud()}else{$('#authMessage').textContent='확인 이메일을 보냈습니다. 인증 후 로그인해 주세요.'}});
-$('#signOutBtn').addEventListener('click',async()=>{await cloud.auth.signOut();updateAuthUI(null);closeAuth();showToast('로그아웃했습니다.')});
+$('#signInBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='로그인 중…';const {data:result,error}=await cloud.auth.signInWithPassword({email,password});if(error){$('#authMessage').textContent=error.message;return}updateAuthUI(result.user);closeAuth();await Promise.all([loadCloud(),loadProducts()])});
+$('#signUpBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='계정 생성 중…';const {data:result,error}=await cloud.auth.signUp({email,password});if(error){$('#authMessage').textContent=error.message;return}if(result.session){updateAuthUI(result.user);closeAuth();await Promise.all([loadCloud(),loadProducts()])}else{$('#authMessage').textContent='확인 이메일을 보냈습니다. 인증 후 로그인해 주세요.'}});
+$('#signOutBtn').addEventListener('click',async()=>{await cloud.auth.signOut();products=[];productHelp.textContent='로그인하면 품명 DB에서 검색할 수 있습니다.';hideProductSuggestions();updateAuthUI(null);closeAuth();showToast('로그아웃했습니다.')});
 cloud.auth.onAuthStateChange((_event,session)=>{updateAuthUI(session?.user||null)});
 
 $('#todayText').textContent=`${date.getMonth()+1}월 ${date.getDate()}일 오늘 출고`;
 render();
-(async()=>{const {data:{session}}=await cloud.auth.getSession();updateAuthUI(session?.user||null);if(session?.user)await loadCloud()})();
+(async()=>{const {data:{session}}=await cloud.auth.getSession();updateAuthUI(session?.user||null);if(session?.user)await Promise.all([loadCloud(),loadProducts()])})();

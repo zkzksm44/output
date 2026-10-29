@@ -2,6 +2,8 @@
 
 모바일에서 출고 품목과 수량을 수기로 입력하고, 출고 구분별 소계와 전체 합계를 자동 계산하는 정적 웹앱입니다.
 
+품명은 Supabase의 `shipping.products`에서 불러오며, 전체 품명이나 초성으로 검색할 수 있습니다.
+
 화면 상단의 **인쇄** 버튼으로 당일 입력된 모든 출고 구분의 품목, 수량, 소계와 전체 합계를 A4 출고일지로 인쇄할 수 있습니다.
 
 ## 로컬 실행
@@ -35,9 +37,10 @@ node -e "const h=require('http'),f=require('fs'),p=require('path');h.createServe
 2. **새 빈 SQL Editor 탭**에 [`01_create_shipping_schema.sql`](supabase/01_create_shipping_schema.sql)의 한 줄만 붙여넣고 실행합니다.
 3. 기존 `public.shipping_journals`에 보존할 데이터가 있는 경우에만 [`migrate_from_public.sql`](supabase/migrate_from_public.sql)을 실행합니다. 최초 설치라면 이 단계는 건너뜁니다.
 4. 다른 새 빈 탭에 [`02_create_shipping_journals.sql`](supabase/02_create_shipping_journals.sql)의 전체 내용을 붙여넣고 실행합니다. 기존 쿼리 내용을 이어 붙이지 마세요.
-5. `select to_regclass('shipping.journals');`를 실행해 결과가 `shipping.journals`인지 확인합니다.
-6. **Integrations → Data API → Exposed schemas**에 `shipping`을 추가합니다. `public`을 제거할지는 다른 기능의 사용 여부에 따라 결정합니다.
-7. **Authentication → URL Configuration**에서 Site URL을 `https://zkzksm44.github.io/output/`으로 설정합니다.
-8. 이메일 확인을 사용하는 경우 Redirect URLs에도 같은 주소를 추가합니다.
+5. 다른 새 빈 탭에 [`03_create_products.sql`](supabase/03_create_products.sql)의 전체 내용을 실행합니다. 검게 지운 품목을 제외한 24개 품목이 등록됩니다.
+6. `select to_regclass('shipping.journals'), to_regclass('shipping.products');`를 실행해 두 결과가 모두 표시되는지 확인합니다.
+7. **Integrations → Data API → Exposed schemas**에 `shipping`을 추가합니다. `public`을 제거할지는 다른 기능의 사용 여부에 따라 결정합니다.
+8. **Authentication → URL Configuration**에서 Site URL을 `https://zkzksm44.github.io/output/`으로 설정합니다.
+9. 이메일 확인을 사용하는 경우 Redirect URLs에도 같은 주소를 추가합니다.
 
 브라우저에는 공개 가능한 publishable key만 사용합니다. Secret 또는 service role 키는 프런트엔드에 추가하면 안 됩니다.

@@ -17,7 +17,7 @@
       <section class="entry-card">
         <div class="section-head"><div><h2 id="categoryTitle">쇼핑몰 업소용</h2><p>출고할 품목과 수량을 입력하세요.</p></div><span id="categorySubtotal">0개</span></div>
         <form id="entryForm">
-          <label class="product-field">품명<input id="productInput" list="products" placeholder="예: 등심 100" autocomplete="off" required><datalist id="products"><option>등심 100</option><option>등심 120</option><option>등심 150</option><option>등심 180</option><option>등심 200</option><option>등심 250</option><option>안심</option><option>치즈</option><option>고치</option><option>고롤</option><option>생선</option><option>양념 생선</option><option>소스 5kg</option><option>롤치</option></datalist><small>같은 품명은 수량이 자동으로 합산됩니다.</small></label>
+          <label class="product-field">품명 또는 초성<div class="product-search"><input id="productInput" placeholder="예: 등심돈까스 또는 ㄷㅅㄷㄲㅅ" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="productSuggestions" aria-expanded="false" required><div id="productSuggestions" class="product-suggestions" role="listbox" hidden></div></div><small id="productHelp">로그인하면 품명 DB에서 검색할 수 있습니다.</small></label>
           <label>수량<div class="stepper"><button type="button" id="minusBtn">−</button><input id="qtyInput" type="number" min="1" value="1" inputmode="numeric" required><button type="button" id="plusBtn">＋</button></div></label>
           <button class="add-btn" type="submit">＋ 목록에 추가</button>
         </form>
