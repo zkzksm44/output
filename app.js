@@ -69,34 +69,37 @@ function render(){
   list.replaceChildren(...rows.map(createItemRow));empty.style.display=rows.length?'none':'block';list.style.display=rows.length?'block':'none';
 }
 
-function buildPrintSheet(){
-  const sheet=$('#printSheet');
-  const heading=document.createElement('header');heading.className='print-heading';
-  const title=document.createElement('h1');title.textContent='출고일지';
-  const printedDate=document.createElement('p');printedDate.textContent=`출고일자  ${workDate}`;
-  heading.append(title,printedDate);
-
-  const summary=document.createElement('p');summary.className='print-summary';
-  summary.textContent=`당일 총 출고수량  ${totals().toLocaleString()}개`;
-  const sections=Object.entries(labels).filter(([category])=>data[category].length).map(([category,label])=>{
-    const section=document.createElement('section');section.className='print-category';
-    const sectionHeading=document.createElement('div');sectionHeading.className='print-category-heading';
-    const name=document.createElement('h2');name.textContent=label;
-    const subtotal=document.createElement('strong');subtotal.textContent=`소계 ${data[category].reduce((sum,item)=>sum+item.qty,0).toLocaleString()}개`;
-    sectionHeading.append(name,subtotal);
-    const table=document.createElement('table');
-    const thead=document.createElement('thead');const headerRow=document.createElement('tr');
-    for(const text of ['번호','품명','수량']){const th=document.createElement('th');th.textContent=text;headerRow.appendChild(th)}
-    thead.appendChild(headerRow);
-    const tbody=document.createElement('tbody');
-    data[category].forEach((item,index)=>{
-      const row=document.createElement('tr');
-      for(const value of [index+1,item.name,item.qty.toLocaleString()]){const cell=document.createElement('td');cell.textContent=value;row.appendChild(cell)}
-      tbody.appendChild(row);
-    });
-    table.append(thead,tbody);section.append(sectionHeading,table);return section;
+function buildExcelRows(){
+  const rows=[
+    ['톰슨팩토리 당일 출고일지','','',''],
+    ['출고일자',new Date(date.getFullYear(),date.getMonth(),date.getDate()),'',''],
+    ['전체 합계',totals(),'개',''],
+    [],
+    ['출고 구분','품명','수량','제조보고번호']
+  ];
+  Object.entries(labels).forEach(([category,label])=>{
+    const items=data[category];
+    if(!items.length)return;
+    items.forEach(item=>rows.push([label,item.name,item.qty,item.reportNumber||'']));
+    rows.push([`${label} 소계`,'',items.reduce((sum,item)=>sum+item.qty,0),'']);
   });
-  sheet.replaceChildren(heading,summary,...sections);
+  rows.push(['전체 합계','',totals(),'']);
+  return rows;
+}
+
+function downloadExcel(){
+  if(!totals()){showToast('다운로드할 출고품목이 없습니다.');return}
+  if(!window.XLSX){showToast('엑셀 모듈을 불러오지 못했습니다. 다시 시도해 주세요.');return}
+  const rows=buildExcelRows();
+  const worksheet=window.XLSX.utils.aoa_to_sheet(rows,{cellDates:true});
+  worksheet['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}}];
+  worksheet['!cols']=[{wch:20},{wch:32},{wch:12},{wch:22}];
+  worksheet['!rows']=[{hpt:24}];
+  if(worksheet.B2)worksheet.B2.z='yyyy-mm-dd';
+  for(let row=5;row<=rows.length;row++){const quantityCell=worksheet[`C${row}`];if(quantityCell?.t==='n')quantityCell.z='#,##0'}
+  const workbook=window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(workbook,worksheet,'당일 출고');
+  window.XLSX.writeFile(workbook,`톰슨팩토리_출고일지_${workDate}.xlsx`,{compression:true});
 }
 
 function openAuth(message=''){$('#authMessage').textContent=message;$('#authModal').classList.add('show');$('#authModal').setAttribute('aria-hidden','false')}
@@ -142,8 +145,7 @@ productSuggestions.addEventListener('mousedown',event=>{const option=event.targe
 document.addEventListener('click',event=>{if(!event.target.closest('.product-search'))hideProductSuggestions()});
 list.addEventListener('click',event=>{const action=event.target.dataset.action,index=Number(event.target.dataset.index);if(!action)return;if(action==='remove')data[active].splice(index,1);if(action==='plus')data[active][index].qty++;if(action==='minus')data[active][index].qty=Math.max(1,data[active][index].qty-1);cache();render()});
 $('#clearBtn').addEventListener('click',()=>{data[active]=[];cache();render()});
-$('#printBtn').addEventListener('click',()=>{if(!totals()){showToast('인쇄할 출고품목이 없습니다.');return}buildPrintSheet();window.print()});
-window.addEventListener('beforeprint',buildPrintSheet);
+$('#excelBtn').addEventListener('click',downloadExcel);
 $('#saveBtn').addEventListener('click',saveCloud);$('#accountBtn').addEventListener('click',()=>openAuth());$('#authClose').addEventListener('click',closeAuth);
 $('#signInBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='로그인 중…';const {data:result,error}=await cloud.auth.signInWithPassword({email,password});if(error){$('#authMessage').textContent=error.message;return}updateAuthUI(result.user);closeAuth();await Promise.all([loadCloud(),loadProducts()])});
 $('#signUpBtn').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='계정 생성 중…';const {data:result,error}=await cloud.auth.signUp({email,password});if(error){$('#authMessage').textContent=error.message;return}if(result.session){updateAuthUI(result.user);closeAuth();await Promise.all([loadCloud(),loadProducts()])}else{$('#authMessage').textContent='확인 이메일을 보냈습니다. 인증 후 로그인해 주세요.'}});
