@@ -69,37 +69,56 @@ function render(){
   list.replaceChildren(...rows.map(createItemRow));empty.style.display=rows.length?'none':'block';list.style.display=rows.length?'block':'none';
 }
 
-function buildExcelRows(){
-  const rows=[
-    ['톰슨팩토리 당일 출고일지','','',''],
-    ['출고일자',new Date(date.getFullYear(),date.getMonth(),date.getDate()),'',''],
-    ['전체 합계',totals(),'개',''],
-    [],
-    ['출고 구분','품명','수량','제조보고번호']
-  ];
-  Object.entries(labels).forEach(([category,label])=>{
-    const items=data[category];
-    if(!items.length)return;
-    items.forEach(item=>rows.push([label,item.name,item.qty,item.reportNumber||'']));
-    rows.push([`${label} 소계`,'',items.reduce((sum,item)=>sum+item.qty,0),'']);
+function buildExcelTable(){
+  const categories=Object.keys(labels),productRows=new Map();
+  categories.forEach((category,categoryIndex)=>{
+    data[category].forEach(item=>{
+      const key=item.key||normalizeName(item.name);
+      if(!productRows.has(key))productRows.set(key,{name:item.name,quantities:Array(categories.length).fill(0)});
+      productRows.get(key).quantities[categoryIndex]+=Number(item.qty)||0;
+    });
   });
-  rows.push(['전체 합계','',totals(),'']);
-  return rows;
+  return [...productRows.values()].map(item=>[item.name,...item.quantities,item.quantities.reduce((sum,qty)=>sum+qty,0)]);
 }
 
-function downloadExcel(){
+async function downloadExcel(){
   if(!totals()){showToast('다운로드할 출고품목이 없습니다.');return}
-  if(!window.XLSX){showToast('엑셀 모듈을 불러오지 못했습니다. 다시 시도해 주세요.');return}
-  const rows=buildExcelRows();
-  const worksheet=window.XLSX.utils.aoa_to_sheet(rows,{cellDates:true});
-  worksheet['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}}];
-  worksheet['!cols']=[{wch:20},{wch:32},{wch:12},{wch:22}];
-  worksheet['!rows']=[{hpt:24}];
-  if(worksheet.B2)worksheet.B2.z='yyyy-mm-dd';
-  for(let row=5;row<=rows.length;row++){const quantityCell=worksheet[`C${row}`];if(quantityCell?.t==='n')quantityCell.z='#,##0'}
-  const workbook=window.XLSX.utils.book_new();
-  window.XLSX.utils.book_append_sheet(workbook,worksheet,'당일 출고');
-  window.XLSX.writeFile(workbook,`톰슨팩토리_출고일지_${workDate}.xlsx`,{compression:true});
+  if(!window.ExcelJS){showToast('엑셀 모듈을 불러오지 못했습니다. 다시 시도해 주세요.');return}
+  const button=$('#excelBtn');button.disabled=true;button.textContent='생성 중…';
+  try{
+    const workbook=new window.ExcelJS.Workbook();
+    workbook.creator='톰슨팩토리';workbook.created=new Date();
+    const worksheet=workbook.addWorksheet('당일 출고',{views:[{state:'frozen',ySplit:5}]});
+    worksheet.mergeCells('A1:G1');worksheet.getCell('A1').value='톰슨팩토리 당일 출고일지';
+    worksheet.getCell('A2').value='출고일자';worksheet.getCell('B2').value=new Date(date.getFullYear(),date.getMonth(),date.getDate());worksheet.getCell('B2').numFmt='yyyy-mm-dd';
+    worksheet.getCell('A3').value='전체 합계';worksheet.getCell('B3').value=totals();worksheet.getCell('B3').numFmt='#,##0';
+    worksheet.addRow([]);
+    const headerRow=worksheet.addRow(['품명',...Object.values(labels),'합계']);
+    buildExcelTable().forEach(row=>worksheet.addRow(row));
+    const categoryTotals=Object.keys(labels).map(category=>data[category].reduce((sum,item)=>sum+(Number(item.qty)||0),0));
+    const totalRow=worksheet.addRow(['합계',...categoryTotals,totals()]);
+
+    worksheet.columns=[{width:30},{width:17},{width:15},{width:21},{width:12},{width:12},{width:13}];
+    worksheet.getCell('A1').font={name:'Arial',size:16,bold:true,color:{argb:'FF192238'}};
+    worksheet.getCell('A1').alignment={vertical:'middle',horizontal:'left'};worksheet.getRow(1).height=28;
+    worksheet.getRow(2).font={name:'Arial',size:10};worksheet.getRow(3).font={name:'Arial',size:10,bold:true};
+    headerRow.height=32;headerRow.font={name:'Arial',size:10,bold:true,color:{argb:'FFFFFFFF'}};headerRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF16243C'}};headerRow.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+    totalRow.font={name:'Arial',size:10,bold:true,color:{argb:'FF16243C'}};totalRow.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEEF4FF'}};
+    const thinBorder={top:{style:'thin',color:{argb:'FFB8C1CF'}},left:{style:'thin',color:{argb:'FFB8C1CF'}},bottom:{style:'thin',color:{argb:'FFB8C1CF'}},right:{style:'thin',color:{argb:'FFB8C1CF'}}};
+    for(let rowNumber=headerRow.number;rowNumber<=totalRow.number;rowNumber++){
+      const row=worksheet.getRow(rowNumber);row.height=rowNumber===headerRow.number?32:22;
+      for(let columnNumber=1;columnNumber<=7;columnNumber++){
+        const cell=row.getCell(columnNumber);cell.border=thinBorder;cell.alignment={vertical:'middle',horizontal:columnNumber===1?'left':'right'};
+        if(columnNumber>1)cell.numFmt='#,##0';
+      }
+    }
+    headerRow.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+    worksheet.autoFilter={from:{row:headerRow.number,column:1},to:{row:totalRow.number-1,column:7}};
+    const buffer=await workbook.xlsx.writeBuffer();
+    const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    const link=document.createElement('a');link.href=url;link.download=`톰슨팩토리_출고일지_${workDate}.xlsx`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(error){console.error(error);showToast('엑셀 파일을 만들지 못했습니다. 다시 시도해 주세요.')}
+  finally{button.disabled=false;button.textContent='엑셀 다운로드'}
 }
 
 function openAuth(message=''){$('#authMessage').textContent=message;$('#authModal').classList.add('show');$('#authModal').setAttribute('aria-hidden','false')}
